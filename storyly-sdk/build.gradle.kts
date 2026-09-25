@@ -78,7 +78,7 @@ mavenPublishing {
         name.set("Storyly")
         description.set("Instagram-style stories for Android, with image, GIF and video support.")
         inceptionYear.set("2026")
-        url.set("https://github.com/naveenmamgain14/storyly")
+        url.set("https://github.com/naveenmamgain14/storyly-android-sdk")
         licenses {
             license {
                 name.set("The Apache License, Version 2.0")
@@ -93,9 +93,9 @@ mavenPublishing {
             }
         }
         scm {
-            url.set("https://github.com/naveenmamgain14/storyly")
-            connection.set("scm:git:git://github.com/naveenmamgain14/storyly.git")
-            developerConnection.set("scm:git:ssh://git@github.com/naveenmamgain14/storyly.git")
+            url.set("https://github.com/naveenmamgain14/storyly-android-sdk")
+            connection.set("scm:git:git://github.com/naveenmamgain14/storyly-android-sdk.git")
+            developerConnection.set("scm:git:ssh://git@github.com/naveenmamgain14/storyly-android-sdk.git")
         }
     }
 
