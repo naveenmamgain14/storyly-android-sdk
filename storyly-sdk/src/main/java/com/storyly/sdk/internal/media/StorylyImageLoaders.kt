@@ -1,7 +1,10 @@
 package com.storyly.sdk.internal.media
 
 import android.content.Context
+import android.os.Build
 import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
@@ -27,6 +30,14 @@ internal object StorylyImageLoaders {
     private fun build(context: Context, diskCacheBytes: Long): ImageLoader =
         ImageLoader.Builder(context)
             .callFactory { StorylyHttp.client }
+            .components {
+                // ImageDecoder is hardware-accelerated but only exists on API 28+.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
             .memoryCache {
                 MemoryCache.Builder(context)
                     .maxSizePercent(MEMORY_CACHE_FRACTION)

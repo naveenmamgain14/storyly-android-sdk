@@ -1,14 +1,20 @@
 package com.storyly.sdk.internal.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationEndReason
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -44,6 +53,7 @@ import coil.compose.AsyncImage
 import com.storyly.sdk.model.Story
 import com.storyly.sdk.model.StoryItem
 import com.storyly.sdk.model.StoryMediaType
+import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -60,6 +70,7 @@ internal fun StoryViewer(
         initialPage = initialStoryIndex.coerceIn(0, (stories.size - 1).coerceAtLeast(0)),
         pageCount = { stories.size },
     )
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(pagerState, stories) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
@@ -69,10 +80,7 @@ internal fun StoryViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(
             Modifier
@@ -80,32 +88,72 @@ internal fun StoryViewer(
                 .background(StorylyTokens.scrim)
         ) {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                stories.getOrNull(page)?.let { story ->
-                    StoryPage(
-                        story = story,
-                        imageLoader = imageLoader,
-                        onActionClick = { item -> onActionClick(story, item) },
-                        onDismiss = onDismiss,
-                    )
-                }
+                val story = stories.getOrNull(page) ?: return@HorizontalPager
+                StoryPage(
+                    story = story,
+                    // Only the story actually on screen runs its timer.
+                    isActive = pagerState.currentPage == page && pagerState.targetPage == page,
+                    imageLoader = imageLoader,
+                    onActionClick = { item -> onActionClick(story, item) },
+                    onFinished = {
+                        if (page < stories.lastIndex) {
+                            scope.launch { pagerState.animateScrollToPage(page + 1) }
+                        } else {
+                            onDismiss()
+                        }
+                    },
+                    onPrevious = {
+                        if (page > 0) scope.launch { pagerState.animateScrollToPage(page - 1) }
+                    },
+                    onDismiss = onDismiss,
+                )
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StoryPage(
     story: Story,
+    isActive: Boolean,
     imageLoader: ImageLoader,
     onActionClick: (StoryItem) -> Unit,
+    onFinished: () -> Unit,
+    onPrevious: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val items = story.items
     if (items.isEmpty()) return
 
-    val itemPager = rememberPagerState(initialPage = 0, pageCount = { items.size })
+    var index by remember { mutableIntStateOf(0) }
+    var paused by remember { mutableStateOf(false) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
+    val progress = remember { Animatable(0f) }
+
+    val item = items.getOrNull(index) ?: items.first()
+
+    // Leaving the story rewinds it, so returning later starts from the top.
+    LaunchedEffect(isActive) {
+        if (!isActive) {
+            index = 0
+            progress.snapTo(0f)
+        }
+    }
+
+    LaunchedEffect(index, isActive) { progress.snapTo(0f) }
+
+    // Not keyed on `paused` resetting progress: resuming continues the remaining time.
+    LaunchedEffect(index, isActive, paused, item.id) {
+        if (!isActive || paused) return@LaunchedEffect
+        if (item.type == StoryMediaType.VIDEO) return@LaunchedEffect
+
+        val remainingMs = ((1f - progress.value) * item.durationSeconds * 1000).toInt()
+        if (remainingMs <= 0) return@LaunchedEffect
+        val result = progress.animateTo(1f, tween(remainingMs, easing = LinearEasing))
+        if (result.endReason == AnimationEndReason.Finished) {
+            if (index < items.lastIndex) index++ else onFinished()
+        }
+    }
 
     Box(
         Modifier
@@ -129,24 +177,43 @@ private fun StoryPage(
                 )
             }
     ) {
-        HorizontalPager(state = itemPager, modifier = Modifier.fillMaxSize()) { index ->
-            StorySlide(item = items[index], imageLoader = imageLoader)
-        }
+        StorySlide(item = item, imageLoader = imageLoader)
+
+        // Tap zones: left third steps back, the rest steps forward. Holding pauses.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(index, items.size) {
+                    detectTapGestures(
+                        onPress = {
+                            paused = true
+                            tryAwaitRelease()
+                            paused = false
+                        },
+                        onTap = { offset ->
+                            if (offset.x < size.width / 3f) {
+                                if (index > 0) index-- else onPrevious()
+                            } else {
+                                if (index < items.lastIndex) index++ else onFinished()
+                            }
+                        },
+                    )
+                }
+        )
 
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(140.dp)
                 .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))
-                )
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)))
         )
 
         Column(Modifier.align(Alignment.TopCenter)) {
             ProgressBars(
                 count = items.size,
-                currentIndex = itemPager.currentPage,
+                currentIndex = index,
+                currentProgress = progress.value,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
             )
             Row(
@@ -163,7 +230,7 @@ private fun StoryPage(
                         overflow = TextOverflow.Ellipsis,
                     )
                     BasicText(
-                        text = "${itemPager.currentPage + 1}/${items.size}",
+                        text = "${index + 1}/${items.size}",
                         style = StorylyTokens.viewerCounter,
                     )
                 }
@@ -171,16 +238,15 @@ private fun StoryPage(
             }
         }
 
-        val current = items.getOrNull(itemPager.currentPage)
-        val actionText = current?.actionText
-        if (current != null && actionText != null) {
+        val actionText = item.actionText
+        if (actionText != null) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 40.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color.White)
-                    .clickable { onActionClick(current) }
+                    .clickable { onActionClick(item) }
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 BasicText(text = actionText, style = StorylyTokens.action)
@@ -199,7 +265,6 @@ private fun StorySlide(item: StoryItem, imageLoader: ImageLoader) {
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
-        // Playback arrives with the Media3 work; until then a slide is never blank.
         StoryMediaType.VIDEO -> Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -212,12 +277,22 @@ private fun StorySlide(item: StoryItem, imageLoader: ImageLoader) {
 }
 
 @Composable
-private fun ProgressBars(count: Int, currentIndex: Int, modifier: Modifier = Modifier) {
+private fun ProgressBars(
+    count: Int,
+    currentIndex: Int,
+    currentProgress: Float,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        repeat(count) { index ->
+        repeat(count) { i ->
+            val fraction = when {
+                i < currentIndex -> 1f
+                i == currentIndex -> currentProgress.coerceIn(0f, 1f)
+                else -> 0f
+            }
             Box(
                 Modifier
                     .weight(1f)
@@ -225,10 +300,11 @@ private fun ProgressBars(count: Int, currentIndex: Int, modifier: Modifier = Mod
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color.White.copy(alpha = 0.3f))
             ) {
-                if (index <= currentIndex) {
+                if (fraction > 0f) {
                     Box(
                         Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth(fraction)
+                            .fillMaxHeight()
                             .background(Color.White)
                     )
                 }
@@ -246,20 +322,8 @@ private fun CloseButton(onClick: () -> Unit) {
             .padding(8.dp)
     ) {
         val stroke = 2.dp.toPx()
-        drawLine(
-            color = Color.White,
-            start = Offset(0f, 0f),
-            end = Offset(size.width, size.height),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round,
-        )
-        drawLine(
-            color = Color.White,
-            start = Offset(size.width, 0f),
-            end = Offset(0f, size.height),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round,
-        )
+        drawLine(Color.White, Offset(0f, 0f), Offset(size.width, size.height), stroke, StrokeCap.Round)
+        drawLine(Color.White, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Round)
     }
 }
 

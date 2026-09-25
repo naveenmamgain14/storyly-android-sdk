@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 
     testImplementation(libs.junit)
 }
