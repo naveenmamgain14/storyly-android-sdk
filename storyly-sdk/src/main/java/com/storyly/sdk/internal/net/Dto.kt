@@ -29,3 +29,16 @@ internal data class StoryItemDto(
     @SerialName("action_url") val actionUrl: String? = null,
     @SerialName("action_text") val actionText: String? = null,
 )
+
+@Serializable
+internal data class AnalyticsEventDto(
+    @SerialName("event_type") val eventType: String,
+    @SerialName("story_id") val storyId: String,
+    @SerialName("story_item_id") val storyItemId: String? = null,
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("session_id") val sessionId: String,
+)
+
+@Serializable
+internal data class AnalyticsBatch(val events: List<AnalyticsEventDto>)

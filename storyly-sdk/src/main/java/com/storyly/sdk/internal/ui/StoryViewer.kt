@@ -71,6 +71,7 @@ internal fun StoryViewer(
     initialStoryIndex: Int,
     imageLoader: ImageLoader,
     onStoryShown: (Story) -> Unit,
+    onStoryCompleted: (Story) -> Unit,
     onActionClick: (Story, StoryItem) -> Unit,
     onDismiss: () -> Unit,
     videoCacheBytes: Long,
@@ -107,6 +108,7 @@ internal fun StoryViewer(
                     player = player,
                     onActionClick = { item -> onActionClick(story, item) },
                     onFinished = {
+                        onStoryCompleted(story)
                         if (page < stories.lastIndex) {
                             scope.launch { pagerState.animateScrollToPage(page + 1) }
                         } else {

@@ -10,6 +10,10 @@ public class StorylyConfig @JvmOverloads constructor(
     public val apiKey: String,
     public val backendUrl: String,
     public val diskCacheBytes: Long = DEFAULT_DISK_CACHE_BYTES,
+    /** Set false to stop the SDK reporting any usage events. */
+    public val analyticsEnabled: Boolean = true,
+    /** Your own identifier for the signed-in user, attached to events. */
+    public val userId: String? = null,
 ) {
     init {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }
@@ -24,13 +28,17 @@ public class StorylyConfig @JvmOverloads constructor(
         if (other !is StorylyConfig) return false
         return apiKey == other.apiKey &&
             backendUrl == other.backendUrl &&
-            diskCacheBytes == other.diskCacheBytes
+            diskCacheBytes == other.diskCacheBytes &&
+            analyticsEnabled == other.analyticsEnabled &&
+            userId == other.userId
     }
 
     override fun hashCode(): Int {
         var result = apiKey.hashCode()
         result = 31 * result + backendUrl.hashCode()
         result = 31 * result + diskCacheBytes.hashCode()
+        result = 31 * result + analyticsEnabled.hashCode()
+        result = 31 * result + (userId?.hashCode() ?: 0)
         return result
     }
 

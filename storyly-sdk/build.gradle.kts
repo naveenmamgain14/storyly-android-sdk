@@ -3,8 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    `maven-publish`
+    alias(libs.plugins.maven.publish)
 }
+
+import com.vanniktech.maven.publish.SonatypeHost
 
 val sdkGroupId = "io.github.naveenmamgain14"
 val sdkArtifactId = "storyly"
@@ -39,12 +41,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-        }
-    }
 }
 
 // Every public declaration must state its visibility and return type.
@@ -75,36 +71,39 @@ dependencies {
     testImplementation(libs.junit)
 }
 
-publishing {
-    publications {
-        register<MavenPublication>("release") {
-            groupId = sdkGroupId
-            artifactId = sdkArtifactId
-            version = sdkVersion
+mavenPublishing {
+    coordinates(sdkGroupId, sdkArtifactId, sdkVersion)
 
-            afterEvaluate { from(components["release"]) }
-
-            pom {
-                name.set("Storyly")
-                description.set("Instagram-style stories for Android, with image, GIF and video support.")
-                url.set("https://github.com/naveenmamgain14/storyly")
-                licenses {
-                    license {
-                        name.set("The Apache License, Version 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set("naveenmamgain14")
-                        name.set("naveenmamgain14")
-                    }
-                }
-                scm {
-                    url.set("https://github.com/naveenmamgain14/storyly")
-                    connection.set("scm:git:git://github.com/naveenmamgain14/storyly.git")
-                }
+    pom {
+        name.set("Storyly")
+        description.set("Instagram-style stories for Android, with image, GIF and video support.")
+        inceptionYear.set("2026")
+        url.set("https://github.com/naveenmamgain14/storyly")
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
             }
         }
+        developers {
+            developer {
+                id.set("naveenmamgain14")
+                name.set("naveenmamgain14")
+                url.set("https://github.com/naveenmamgain14")
+            }
+        }
+        scm {
+            url.set("https://github.com/naveenmamgain14/storyly")
+            connection.set("scm:git:git://github.com/naveenmamgain14/storyly.git")
+            developerConnection.set("scm:git:ssh://git@github.com/naveenmamgain14/storyly.git")
+        }
+    }
+
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = false)
+
+    // Signing is required by Central but must not block a local publish, so it
+    // switches on only once a key is actually configured.
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+        signAllPublications()
     }
 }

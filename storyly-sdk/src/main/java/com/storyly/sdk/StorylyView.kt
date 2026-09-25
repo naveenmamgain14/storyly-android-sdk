@@ -13,6 +13,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.DisposableEffect
+import com.storyly.sdk.internal.analytics.StoryEvent
+import com.storyly.sdk.internal.analytics.StorylyAnalytics
 import com.storyly.sdk.internal.media.StorylyImageLoaders
 import com.storyly.sdk.internal.net.StorylyClient
 import com.storyly.sdk.internal.ui.StoryRail
@@ -48,6 +51,10 @@ public fun StorylyView(
         StorylyImageLoaders.get(context, config.diskCacheBytes)
     }
     val client = remember(config) { StorylyClient(config) }
+    val analytics = remember(config) {
+        StorylyAnalytics(context, client, config.userId, config.analyticsEnabled)
+    }
+    DisposableEffect(analytics) { onDispose { analytics.shutdown() } }
 
     var state by remember { mutableStateOf<RailState>(RailState.Loading) }
     var retryToken by remember { mutableIntStateOf(0) }
@@ -68,6 +75,7 @@ public fun StorylyView(
 
     // Warm the thumbnails the user is most likely to tap next.
     LaunchedEffect(stories) {
+        stories.forEach { analytics.track(StoryEvent.IMPRESSION, it.id) }
         if (stories.isNotEmpty()) {
             StorylyImageLoaders.prefetch(
                 context = context,
@@ -99,6 +107,9 @@ public fun StorylyView(
                         current.stories.getOrNull(index)?.let { story ->
                             seen = seen + story.id
                             openedIndex = index
+                            // VIEW is emitted by onStoryShown, which also covers
+                            // swiping between stories. Tracking it here too would
+                            // double-count every open.
                             currentListener?.onStoryOpened(story)
                         }
                     },
@@ -124,10 +135,20 @@ public fun StorylyView(
             stories = stories,
             initialStoryIndex = index,
             imageLoader = imageLoader,
-            onStoryShown = { seen = seen + it.id },
-            onActionClick = { story, item -> currentListener?.onActionClicked(story, item) },
+            onStoryShown = { story ->
+                seen = seen + story.id
+                analytics.track(StoryEvent.VIEW, story.id)
+            },
+            onStoryCompleted = { story -> analytics.track(StoryEvent.COMPLETE, story.id) },
+            onActionClick = { story, item ->
+                analytics.track(StoryEvent.CLICK, story.id, item.id)
+                currentListener?.onActionClicked(story, item)
+            },
             onDismiss = {
-                stories.getOrNull(index)?.let { currentListener?.onStoryClosed(it) }
+                stories.getOrNull(index)?.let {
+                    analytics.track(StoryEvent.DISMISS, it.id)
+                    currentListener?.onStoryClosed(it)
+                }
                 openedIndex = null
             },
             videoCacheBytes = config.diskCacheBytes,

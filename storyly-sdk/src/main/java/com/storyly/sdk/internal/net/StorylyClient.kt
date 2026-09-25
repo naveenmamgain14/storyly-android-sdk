@@ -8,7 +8,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
 import kotlin.coroutines.resume
@@ -40,6 +42,18 @@ internal class StorylyClient(
         return envelope.data.map { it.toStory() }
     }
 
+    /** Fire-and-forget: analytics must never surface an error into the host app. */
+    suspend fun sendEvents(events: List<AnalyticsEventDto>) {
+        if (events.isEmpty()) return
+        val payload = json.encodeToString(AnalyticsBatch.serializer(), AnalyticsBatch(events))
+        val request = Request.Builder()
+            .url("${config.baseUrl}/api/v1/sdk/analytics/batch")
+            .header("X-API-Key", config.apiKey)
+            .post(payload.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        runCatching { callFactory.newCall(request).awaitBody() }
+    }
+
     private suspend fun Call.awaitBody(): String = suspendCancellableCoroutine { cont ->
         // Cancelling the coroutine must cancel the in-flight request, otherwise a
         // scrolled-away rail keeps a socket busy.
@@ -68,14 +82,14 @@ internal class StorylyClient(
     }
 }
 
-private fun Int.toHttpMessage(): String = when {
+internal fun Int.toHttpMessage(): String = when {
     this == 401 || this == 403 -> "Invalid API key"
     this == 404 -> "Stories endpoint not found"
     this >= 500 -> "Server error ($this)"
     else -> "Request failed ($this)"
 }
 
-private fun StoryDto.toStory(): Story {
+internal fun StoryDto.toStory(): Story {
     val mapped = items.mapNotNull { it.toStoryItem() }
     return Story(
         id = id,
@@ -86,7 +100,7 @@ private fun StoryDto.toStory(): Story {
     )
 }
 
-private fun StoryItemDto.toStoryItem(): StoryItem? {
+internal fun StoryItemDto.toStoryItem(): StoryItem? {
     val media = mediaUrl?.takeIf { it.isNotBlank() } ?: return null
     return StoryItem(
         id = id.ifBlank { media },
@@ -102,11 +116,13 @@ private fun StoryItemDto.toStoryItem(): StoryItem? {
  * The backend only distinguishes image from video, so GIFs arrive typed as
  * images. They need a different decoder, so detect them from the URL path.
  */
-private fun resolveMediaType(rawType: String, url: String): StoryMediaType {
+internal fun resolveMediaType(rawType: String, url: String): StoryMediaType {
     if (rawType.equals("video", ignoreCase = true)) return StoryMediaType.VIDEO
     val path = url.substringBefore('?').substringBefore('#')
     return if (path.endsWith(".gif", ignoreCase = true)) StoryMediaType.GIF else StoryMediaType.IMAGE
 }
+
+private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
 private const val MIN_DURATION_SECONDS = 1
 private const val MAX_DURATION_SECONDS = 60
