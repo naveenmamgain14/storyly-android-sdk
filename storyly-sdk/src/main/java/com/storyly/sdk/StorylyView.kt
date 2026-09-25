@@ -130,6 +130,7 @@ public fun StorylyView(
                 stories.getOrNull(index)?.let { currentListener?.onStoryClosed(it) }
                 openedIndex = null
             },
+            videoCacheBytes = config.diskCacheBytes,
         )
     }
 }

@@ -34,6 +34,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import com.storyly.sdk.internal.media.rememberStorylyPlayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,7 +73,9 @@ internal fun StoryViewer(
     onStoryShown: (Story) -> Unit,
     onActionClick: (Story, StoryItem) -> Unit,
     onDismiss: () -> Unit,
+    videoCacheBytes: Long,
 ) {
+    val player = rememberStorylyPlayer(videoCacheBytes)
     val pagerState = rememberPagerState(
         initialPage = initialStoryIndex.coerceIn(0, (stories.size - 1).coerceAtLeast(0)),
         pageCount = { stories.size },
@@ -94,6 +104,7 @@ internal fun StoryViewer(
                     // Only the story actually on screen runs its timer.
                     isActive = pagerState.currentPage == page && pagerState.targetPage == page,
                     imageLoader = imageLoader,
+                    player = player,
                     onActionClick = { item -> onActionClick(story, item) },
                     onFinished = {
                         if (page < stories.lastIndex) {
@@ -117,6 +128,7 @@ private fun StoryPage(
     story: Story,
     isActive: Boolean,
     imageLoader: ImageLoader,
+    player: ExoPlayer,
     onActionClick: (StoryItem) -> Unit,
     onFinished: () -> Unit,
     onPrevious: () -> Unit,
@@ -131,6 +143,7 @@ private fun StoryPage(
     val progress = remember { Animatable(0f) }
 
     val item = items.getOrNull(index) ?: items.first()
+    val advance: () -> Unit = { if (index < items.lastIndex) index++ else onFinished() }
 
     // Leaving the story rewinds it, so returning later starts from the top.
     LaunchedEffect(isActive) {
@@ -145,14 +158,22 @@ private fun StoryPage(
     // Not keyed on `paused` resetting progress: resuming continues the remaining time.
     LaunchedEffect(index, isActive, paused, item.id) {
         if (!isActive || paused) return@LaunchedEffect
-        if (item.type == StoryMediaType.VIDEO) return@LaunchedEffect
+
+        if (item.type == StoryMediaType.VIDEO) {
+            // Position-driven, so the bar tracks real playback including buffering.
+            while (true) {
+                val total = player.duration
+                if (total > 0) {
+                    progress.snapTo((player.currentPosition.toFloat() / total).coerceIn(0f, 1f))
+                }
+                withFrameMillis { }
+            }
+        }
 
         val remainingMs = ((1f - progress.value) * item.durationSeconds * 1000).toInt()
         if (remainingMs <= 0) return@LaunchedEffect
         val result = progress.animateTo(1f, tween(remainingMs, easing = LinearEasing))
-        if (result.endReason == AnimationEndReason.Finished) {
-            if (index < items.lastIndex) index++ else onFinished()
-        }
+        if (result.endReason == AnimationEndReason.Finished) advance()
     }
 
     Box(
@@ -177,7 +198,14 @@ private fun StoryPage(
                 )
             }
     ) {
-        StorySlide(item = item, imageLoader = imageLoader)
+        StorySlide(
+            item = item,
+            imageLoader = imageLoader,
+            player = player,
+            isActive = isActive,
+            paused = paused,
+            onEnded = advance,
+        )
 
         // Tap zones: left third steps back, the rest steps forward. Holding pauses.
         Box(
@@ -194,7 +222,7 @@ private fun StoryPage(
                             if (offset.x < size.width / 3f) {
                                 if (index > 0) index-- else onPrevious()
                             } else {
-                                if (index < items.lastIndex) index++ else onFinished()
+                                advance()
                             }
                         },
                     )
@@ -256,7 +284,14 @@ private fun StoryPage(
 }
 
 @Composable
-private fun StorySlide(item: StoryItem, imageLoader: ImageLoader) {
+private fun StorySlide(
+    item: StoryItem,
+    imageLoader: ImageLoader,
+    player: ExoPlayer,
+    isActive: Boolean,
+    paused: Boolean,
+    onEnded: () -> Unit,
+) {
     when (item.type) {
         StoryMediaType.IMAGE, StoryMediaType.GIF -> AsyncImage(
             model = item.url,
@@ -265,13 +300,64 @@ private fun StorySlide(item: StoryItem, imageLoader: ImageLoader) {
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
-        StoryMediaType.VIDEO -> Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF111111)),
-        ) {
-            BasicText(text = "Video", style = StorylyTokens.viewerCounter)
+
+        StoryMediaType.VIDEO -> VideoSlide(
+            url = item.url,
+            player = player,
+            isActive = isActive,
+            paused = paused,
+            onEnded = onEnded,
+        )
+    }
+}
+
+@Composable
+private fun VideoSlide(
+    url: String,
+    player: ExoPlayer,
+    isActive: Boolean,
+    paused: Boolean,
+    onEnded: () -> Unit,
+) {
+    // Adjacent pager pages are composed ahead of time; only the visible one may
+    // claim the shared player, otherwise neighbours fight over playback.
+    if (isActive) {
+        LaunchedEffect(url) {
+            player.setMediaItem(MediaItem.fromUri(url))
+            player.prepare()
+            player.playWhenReady = !paused
+        }
+
+        LaunchedEffect(paused) { player.playWhenReady = !paused }
+
+        DisposableEffect(url, onEnded) {
+            val listener = object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_ENDED) onEnded()
+                }
+            }
+            player.addListener(listener)
+            onDispose { player.removeListener(listener) }
+        }
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
+        if (isActive) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        useController = false
+                        this.player = player
+                    }
+                },
+                update = { it.player = player },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
