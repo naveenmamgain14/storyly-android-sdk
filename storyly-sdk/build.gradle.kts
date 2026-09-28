@@ -10,7 +10,7 @@ import com.vanniktech.maven.publish.SonatypeHost
 
 val sdkGroupId = "io.github.naveenmamgain14"
 val sdkArtifactId = "storyly"
-val sdkVersion = "0.1.0"
+val sdkVersion = "0.1.2"
 
 android {
     namespace = "com.storyly.sdk"

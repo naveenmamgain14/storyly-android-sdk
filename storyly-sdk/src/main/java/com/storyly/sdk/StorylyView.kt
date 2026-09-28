@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.DisposableEffect
 import com.storyly.sdk.internal.analytics.StoryEvent
+import com.storyly.sdk.internal.cache.StoryCache
 import com.storyly.sdk.internal.analytics.StorylyAnalytics
 import com.storyly.sdk.internal.media.StorylyImageLoaders
 import com.storyly.sdk.internal.net.StorylyClient
@@ -51,6 +52,7 @@ public fun StorylyView(
         StorylyImageLoaders.get(context, config.diskCacheBytes)
     }
     val client = remember(config) { StorylyClient(config) }
+    val cache = remember(config) { StoryCache(context, config) }
     val analytics = remember(config) {
         StorylyAnalytics(context, client, config.userId, config.analyticsEnabled)
     }
@@ -63,11 +65,22 @@ public fun StorylyView(
 
     LaunchedEffect(config, retryToken) {
         state = RailState.Loading
-        state = try {
-            RailState.Ready(client.fetchStories())
+
+        // Paint the last good response first so a cold start shows stories
+        // rather than a skeleton, then revalidate against the network.
+        val cached = cache.read()?.let { runCatching { client.parse(it) }.getOrNull() }
+        if (!cached.isNullOrEmpty()) state = RailState.Ready(cached)
+
+        try {
+            val body = client.fetchRaw()
+            val fresh = client.parse(body)
+            cache.write(body)
+            state = RailState.Ready(fresh)
         } catch (e: Exception) {
             currentListener?.onLoadFailed(e)
-            RailState.Failed(e.toDisplayMessage())
+            // A failed refresh must not wipe content that is already on screen;
+            // only surface the error when there is nothing to show.
+            if (state !is RailState.Ready) state = RailState.Failed(e.toDisplayMessage())
         }
     }
 

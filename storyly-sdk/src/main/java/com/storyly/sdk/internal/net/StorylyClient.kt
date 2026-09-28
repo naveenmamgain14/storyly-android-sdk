@@ -26,7 +26,10 @@ internal class StorylyClient(
         coerceInputValues = true
     }
 
-    suspend fun fetchStories(): List<Story> {
+    suspend fun fetchStories(): List<Story> = parse(fetchRaw())
+
+    /** The raw response body, so callers can cache exactly what the server sent. */
+    suspend fun fetchRaw(): String {
         val request = Request.Builder()
             .url("${config.baseUrl}/api/v1/sdk/stories")
             .header("X-API-Key", config.apiKey)
@@ -34,7 +37,10 @@ internal class StorylyClient(
             .get()
             .build()
 
-        val body = callFactory.newCall(request).awaitBody()
+        return callFactory.newCall(request).awaitBody()
+    }
+
+    fun parse(body: String): List<Story> {
         val envelope = json.decodeFromString(StoriesEnvelope.serializer(), body)
         if (!envelope.success) {
             throw IOException(envelope.error ?: "Request rejected by server")
