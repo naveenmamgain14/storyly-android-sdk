@@ -1,419 +1,202 @@
-# Storyly - Instagram-Style Stories SDK for Android
+# Storyly
 
-Complete solution for adding Instagram/Snapchat-style stories to any Android app.
-
-<img src="https://img.shields.io/badge/Platform-Android-green.svg" />
-<img src="https://img.shields.io/badge/Language-Kotlin-purple.svg" />
-<img src="https://img.shields.io/badge/Compose-UI-blue.svg" />
-
----
-
-## ✨ Features
-
-- 📱 **Drop-in Compose Component** - Add stories with one line of code
-- 🎨 **Instagram-Style UI** - Horizontal scrolling, gradient rings, full-screen viewer
-- 👁️ **Seen/Unseen Tracking** - Visual indicators for viewed stories
-- 🔄 **Auto-Loading** - Stories load automatically from backend
-- 👆 **Rich Interactions** - Tap to open, swipe to navigate, swipe down to close
-- 📊 **Web Dashboard** - Upload and manage stories via web interface
-- 🚀 **Production Ready** - Complete backend API and database
-
----
-
-## 🎬 Demo
-
-```kotlin
-// That's all you need!
-StorylyView(apiKey = "YOUR_API_KEY")
-```
-
-**What you get:**
-- Horizontal story circles at top
-- Colorful gradient rings for unseen stories
-- Tap to open full-screen viewer
-- Swipe between stories and items
-- Swipe down to close
-- Progress indicators
-- Auto-marks as seen
-
----
-
-## 📦 Installation
-
-### 1. Add SDK to your project
-
-```kotlin
-// settings.gradle.kts
-include(":storyly-sdk")
-
-// app/build.gradle.kts
-dependencies {
-    implementation(project(":storyly-sdk"))
-    implementation("io.coil-kt:coil-compose:2.5.0")
-}
-```
-
-### 2. Use in your app
-
-```kotlin
-import com.storyly.sdk.ui.StorylyView
-
-@Composable
-fun MyScreen() {
-    Column {
-        // Add stories
-        StorylyView(apiKey = "YOUR_API_KEY")
-        
-        // Rest of your content
-    }
-}
-```
-
----
-
-## 🎯 Quick Start
-
-### 1. Start Backend
-
-```bash
-cd backend
-npm install
-npm run dev
-# Runs on http://localhost:3000
-```
-
-### 2. Start Dashboard
-
-```bash
-cd dashboard
-npm install
-npm run dev
-# Runs on http://localhost:5173
-```
-
-### 3. Create Stories
-
-1. Open http://localhost:5173/stories
-2. Click "+ Create Story"
-3. Upload image/video
-4. Publish
-5. ✅ Appears in app instantly!
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│  Android App    │
-│  + Storyly SDK  │
-└────────┬────────┘
-         │
-         │ API Key
-         │
-┌────────▼────────┐      ┌──────────────┐
-│  Backend API    │◄─────┤  Dashboard   │
-│  (Node.js)      │      │  (React)     │
-└────────┬────────┘      └──────────────┘
-         │
-         │
-┌────────▼────────┐
-│   PostgreSQL    │
-│   Database      │
-└─────────────────┘
-```
-
----
-
-## 📱 SDK Components
-
-### StorylyView
-
-Main component that displays stories:
+Instagram-style stories for Android — image, animated GIF and video, with both a
+Compose and a View-based entry point.
 
 ```kotlin
 StorylyView(
-    apiKey = "sk_your_api_key",
-    modifier = Modifier.fillMaxWidth(),
     config = StorylyConfig(
-        baseUrl = "http://10.0.2.2:3000"
+        apiKey = "your-api-key",
+        backendUrl = "https://stories.example.com",
     )
 )
 ```
 
-### Features
+That renders a tappable rail of story circles and a full-screen viewer with timed
+playback, progress bars, tap navigation and hold-to-pause.
 
-| Feature | Description |
-|---------|-------------|
-| **Horizontal Scroll** | Instagram-style story circles |
-| **Gradient Rings** | Colorful for unseen, gray for seen |
-| **Auto-Load** | Stories load on app start |
-| **Full-Screen** | Tap to open viewer |
-| **Swipe Navigation** | Left/right for next/prev |
-| **Swipe to Close** | Swipe down to dismiss |
-| **Progress Bars** | Multiple bars for multi-item stories |
-| **No Ripple** | Clean tap interaction |
+## Install
 
----
-
-## 🔧 Backend API
-
-### Endpoints
-
-```
-GET    /api/v1/sdk/stories           # Get stories (mobile SDK)
-GET    /api/v1/stories                # Get stories (dashboard)
-POST   /api/v1/stories                # Create story
-POST   /api/v1/media/upload           # Upload image/video
-DELETE /api/v1/stories/:id            # Delete story
-POST   /api/v1/stories/:id/publish    # Publish story
-```
-
-### Authentication
-
-All requests require API key:
-
-```
-X-API-Key: sk_your_api_key
-```
-
----
-
-## 🎨 Dashboard
-
-Web interface for managing stories:
-
-- 📤 Upload images/videos
-- 📝 Add titles and descriptions
-- 📊 View all stories
-- 🗑️ Delete stories
-- 📱 Publish/unpublish
-- 🖼️ Visual thumbnails
-
-**URL:** http://localhost:5173
-
----
-
-## 💾 Database Schema
-
-### Stories Table
-```sql
-- id (uuid)
-- title (string)
-- description (string)
-- status (DRAFT | PUBLISHED)
-- created_at (timestamp)
-```
-
-### Story Items Table
-```sql
-- id (uuid)
-- story_id (uuid)
-- media_id (uuid)
-- type (IMAGE | VIDEO)
-- duration (int)
-- order (int)
-```
-
-### Media Table
-```sql
-- id (uuid)
-- filename (string)
-- cdn_url (string)
-- size (bigint)
-- mime_type (string)
-```
-
----
-
-## 🎯 Use Cases
-
-### E-commerce
-- Product launches
-- Flash sales
-- New arrivals
-
-### Social Apps
-- User stories
-- Updates
-- Announcements
-
-### News Apps
-- Breaking news
-- Top stories
-- Updates
-
-### Any App
-- Onboarding
-- Feature highlights
-- Promotions
-
----
-
-## 📂 Project Structure
-
-```
-storyly/
-├── storyly-sdk/               # Android SDK module
-│   └── src/main/java/com/storyly/sdk/
-│       └── ui/
-│           └── StorylyView.kt # Main UI component
-├── app/                       # Demo app
-│   └── src/main/java/
-│       └── MainActivity.kt    # Integration example
-├── backend/                   # Node.js API
-│   ├── src/
-│   │   ├── controllers/       # API controllers
-│   │   ├── routes/            # API routes
-│   │   └── index.ts           # Server entry
-│   └── prisma/
-│       └── schema.prisma      # Database schema
-└── dashboard/                 # React dashboard
-    └── src/
-        ├── pages/
-        │   └── Stories.tsx    # Story management
-        └── services/
-            └── api.ts         # API client
-```
-
----
-
-## 🔑 Configuration
-
-### Backend URL
-
-For emulator (default):
 ```kotlin
-baseUrl = "http://10.0.2.2:3000"
+// settings.gradle.kts — mavenCentral() is usually already there
+dependencyResolutionManagement {
+    repositories { mavenCentral() }
+}
+
+// build.gradle.kts
+dependencies {
+    implementation("io.github.naveenmamgain14:storyly:0.1.0")
+}
 ```
 
-For physical device:
+Requires **minSdk 24**. The rail is a Compose component; `StorylyRailView` wraps it
+for apps that are not on Compose.
+
+## You need a backend
+
+This library is only the client. It expects an HTTP endpoint that returns your
+stories, authenticated with an `X-API-Key` header. Point `backendUrl` at the host
+and the SDK calls `GET {backendUrl}/api/v1/sdk/stories`.
+
+The response it reads:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "story-1",
+      "title": "Flu Season Essentials",
+      "description": "optional",
+      "thumbnail_url": "https://cdn.example.com/thumb.jpg",
+      "items": [
+        {
+          "id": "item-1",
+          "type": "image",
+          "media_url": "https://cdn.example.com/slide.jpg",
+          "duration": 5,
+          "action_url": "https://example.com/offer",
+          "action_text": "Book now"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Notes on the fields:
+
+- `type` is `"image"` or `"video"`. GIFs are detected from a `.gif` URL, so they
+  can be sent as `"image"`.
+- `duration` is seconds, clamped to 1–60. Ignored for video, which plays to its end.
+- `thumbnail_url` is optional; the first item's `media_url` is used if absent.
+- Items without a usable `media_url` are skipped rather than rendered blank.
+- `action_url` / `action_text` are optional. A button appears only when
+  `action_text` is set, and tapping it calls your listener — the SDK does not
+  navigate for you.
+
+## Compose
+
 ```kotlin
-baseUrl = "http://YOUR_COMPUTER_IP:3000"
+@Composable
+fun Home() {
+    StorylyView(
+        config = StorylyConfig(apiKey = BuildConfig.STORYLY_KEY, backendUrl = "https://stories.example.com"),
+        listener = object : StorylyListener {
+            override fun onActionClicked(story: Story, item: StoryItem) {
+                item.actionUrl?.let { openInBrowser(it) }
+            }
+        },
+    )
+}
 ```
 
-For production:
+## XML / Views
+
+```xml
+<com.storyly.sdk.StorylyRailView
+    android:id="@+id/storyly"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />
+```
+
 ```kotlin
-baseUrl = "https://api.yourapp.com"
+findViewById<StorylyRailView>(R.id.storyly).apply {
+    config = StorylyConfig(apiKey = "…", backendUrl = "https://stories.example.com")
+    listener = myListener
+}
 ```
 
----
+Setting `config` starts the load; setting it again reloads. The view must sit in a
+normal Activity or Fragment layout so it has a lifecycle owner.
 
-## 🚀 Production Deployment
+## Configuration
 
-### 1. Backend
-- Deploy to Heroku, Railway, Vercel
-- Set environment variables
-- Update CORS settings
+| Parameter | Default | Purpose |
+|---|---|---|
+| `apiKey` | required | Sent as `X-API-Key` |
+| `backendUrl` | required | Host serving your stories. No default — each app points at its own |
+| `diskCacheBytes` | 64 MB | On-disk media cache budget |
+| `analyticsEnabled` | `true` | Set `false` to send no usage events at all |
+| `userId` | `null` | Your own user identifier, attached to events |
 
-### 2. Database
-- Use managed PostgreSQL (Supabase, Railway)
-- Update connection string
+## Listener
 
-### 3. Media
-- Use S3, Cloudinary for uploads
-- Update media controller
+Every method has a default no-op, so override only what you need.
 
-### 4. SDK
-- Update baseUrl in config
-- Secure API keys
-
----
-
-## 📊 Tech Stack
-
-### Android SDK
-- Kotlin
-- Jetpack Compose
-- Coil (image loading)
-- Material 3
-
-### Backend
-- Node.js
-- TypeScript
-- Express
-- Prisma ORM
-- PostgreSQL
-
-### Dashboard
-- React 18
-- TypeScript
-- TailwindCSS
-- Vite
-- Axios
-
----
-
-## 🎓 Integration Guide
-
-**See:** [SDK_INTEGRATION_GUIDE.md](./SDK_INTEGRATION_GUIDE.md)
-
-Complete guide with:
-- Step-by-step setup
-- Code examples
-- API documentation
-- Troubleshooting
-- Customization
-
----
-
-## 🆘 Troubleshooting
-
-### Stories not loading
-```bash
-# Check backend
-curl http://localhost:3000/health
-
-# Check API key
-curl -H "X-API-Key: YOUR_KEY" \
-     http://localhost:3000/api/v1/sdk/stories
+```kotlin
+interface StorylyListener {
+    fun onStoryOpened(story: Story) {}
+    fun onStoryClosed(story: Story) {}
+    fun onActionClicked(story: Story, item: StoryItem) {}
+    fun onLoadFailed(error: Throwable) {}
+}
 ```
 
-### Build errors
-```bash
-# Clean and rebuild
-./gradlew clean assembleDebug
+## Behaviour
+
+**Playback.** Each slide shows for its own duration, then advances. Finishing a
+story moves to the next; finishing the last one closes the viewer. Video plays to
+its end and drives the progress bar from real playback position.
+
+**Gestures.** Tap the left third to go back, anywhere else to go forward. Press and
+hold to pause, release to resume from where it stopped. Swipe down to dismiss.
+Swipe left/right to move between stories.
+
+**States.** While loading, the rail shows placeholder circles. On failure it shows a
+short reason and a Retry button rather than an empty space — `"No internet
+connection"`, `"Connection timed out"`, `"Invalid API key"`. When there are
+genuinely no stories, the rail renders nothing.
+
+**Seen stories** dim their ring for the current session. This is in-memory only and
+is not persisted.
+
+## Analytics
+
+When enabled, the SDK posts to `{backendUrl}/api/v1/sdk/analytics/batch`:
+
+```json
+{ "events": [ {
+  "event_type": "VIEW",
+  "story_id": "story-1",
+  "story_item_id": "item-1",
+  "user_id": null,
+  "device_id": "random-uuid",
+  "session_id": "random-uuid"
+} ] }
 ```
 
-### Images not showing
-- Use `10.0.2.2` for emulator
-- Check uploads directory exists
-- Verify CORS settings
+`IMPRESSION` when a story appears in the rail, `VIEW` when it is shown in the
+viewer, `CLICK` on an action button, `COMPLETE` when all its slides finish, and
+`DISMISS` when the viewer is closed.
 
----
+Events are buffered and flushed on a 4-second window or a 20-event batch, so a
+burst of taps is not a burst of requests. Delivery is best-effort: failures are
+swallowed and never surface to your UI.
 
-## 📝 License
+`device_id` is a random UUID generated on first run and kept in the SDK's own
+`SharedPreferences`. No hardware or advertising identifiers are read. Set
+`analyticsEnabled = false` and nothing is sent.
 
-MIT License - use freely in your projects
+## What it brings in
 
----
+Compose UI and Foundation, Coil (+ GIF decoder), Media3 ExoPlayer, OkHttp and
+kotlinx-serialization. There is deliberately **no Material dependency** — the SDK
+draws its own styling, so it will not pull a design system into your app or read
+your theme.
 
-## 🌟 Features Roadmap
+Consumer ProGuard rules ship with the artifact; nothing to add for release builds.
 
-- [ ] Video support
-- [ ] Analytics tracking
-- [ ] Deep linking
-- [ ] Offline caching
-- [ ] Custom themes
-- [ ] Link actions
-- [ ] Product tags
-- [ ] Maven publication
+## Sample
 
----
+The `app` module in this repository is a working demo. To run it, put your own
+credentials in `local.properties` (which is gitignored):
 
-## 🤝 Contributing
+```properties
+storyly.apiKey=your-api-key
+storyly.backendUrl=https://stories.example.com
+```
 
-This is a complete, production-ready solution. Feel free to customize for your needs!
+## License
 
----
-
-## 📞 Support
-
-- **API Key:** `sk_storyly_android_app_2026`
-- **Backend:** http://localhost:3000
-- **Dashboard:** http://localhost:5173
-- **Database:** PostgreSQL on port 5432
-
----
-
-Built with ❤️ using Kotlin, Compose, Node.js, and React
+Apache 2.0 — see [LICENSE](LICENSE).
