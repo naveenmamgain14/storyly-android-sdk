@@ -30,6 +30,9 @@ internal object StorylyImageLoaders {
     private fun build(context: Context, diskCacheBytes: Long): ImageLoader =
         ImageLoader.Builder(context)
             .callFactory { StorylyHttp.client }
+            // Fading in reads as loading; snapping in reads as jank, even when
+            // it is the same number of milliseconds.
+            .crossfade(CROSSFADE_MS)
             .components {
                 // ImageDecoder is hardware-accelerated but only exists on API 28+.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -69,6 +72,7 @@ internal object StorylyImageLoaders {
         }
     }
 
+    private const val CROSSFADE_MS = 180
     private const val MEMORY_CACHE_FRACTION = 0.25
     private const val DISK_CACHE_DIR = "storyly_media"
 }

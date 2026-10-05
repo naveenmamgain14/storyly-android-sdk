@@ -295,13 +295,20 @@ private fun StorySlide(
     onEnded: () -> Unit,
 ) {
     when (item.type) {
-        StoryMediaType.IMAGE, StoryMediaType.GIF -> AsyncImage(
-            model = item.url,
-            imageLoader = imageLoader,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
+        StoryMediaType.IMAGE, StoryMediaType.GIF -> Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(StorylyTokens.scrim),
+        ) {
+            AsyncImage(
+                model = item.url,
+                imageLoader = imageLoader,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
 
         StoryMediaType.VIDEO -> VideoSlide(
             url = item.url,

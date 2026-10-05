@@ -92,6 +92,16 @@ private fun StoryCircle(
             ) {
                 val thumbnail = story.thumbnailUrl
                 if (thumbnail != null) {
+                    // The placeholder sits underneath rather than being swapped
+                    // for, so the circle is never an empty white hole on a slow
+                    // connection — it reads as the same loading state the rail
+                    // already uses.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(StorylyTokens.placeholder)
+                    )
                     AsyncImage(
                         model = thumbnail,
                         imageLoader = imageLoader,
