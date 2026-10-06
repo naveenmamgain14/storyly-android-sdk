@@ -25,9 +25,13 @@ dependencyResolutionManagement {
 
 // build.gradle.kts
 dependencies {
-    implementation("io.github.naveenmamgain14:storyly:0.1.0")
+    implementation("io.github.naveenmamgain14:storyly:0.1.3")
 }
 ```
+
+> **Do not use 0.1.0.** It crashes when a story is opened on Compose 1.7 or
+> newer. Maven Central cannot remove a published version, so it remains
+> downloadable — use 0.1.3 or later.
 
 Requires **minSdk 24**. The rail is a Compose component; `StorylyRailView` wraps it
 for apps that are not on Compose.
